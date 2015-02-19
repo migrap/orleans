@@ -119,7 +119,7 @@ namespace Orleans.CodeGeneration.Serialization
             var classTypeReference = new CodeTypeReference(GLOBAL_NAMESPACE_PREFIX+className);
             var objectTypeReference = new CodeTypeReference(typeof(object));
             var serMgrRefExp = new CodeTypeReferenceExpression(GLOBAL_NAMESPACE_PREFIX + typeof(SerializationManager).FullName);
-            var currentSerialzationContext = new CodePropertyReferenceExpression(new CodeTypeReferenceExpression(typeof(SerializationContext)), "Current");
+            var currentSerialzationContext = new CodePropertyReferenceExpression(new CodeTypeReferenceExpression(GLOBAL_NAMESPACE_PREFIX + typeof(SerializationContext).FullName), "Current");
 
             // Static DeepCopyInner method:
             var copier = new CodeMemberMethod();
