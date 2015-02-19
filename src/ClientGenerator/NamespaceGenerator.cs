@@ -472,15 +472,22 @@ namespace Orleans.CodeGeneration
                 ReturnType = returnType
             };
 
-            foreach (var param in methodInfo.GetParameters())
-            {
+            foreach (var param in methodInfo.GetParameters()) {
                 var paramName = GetParameterName(param);
-                CodeParameterDeclarationExpression p = param.ParameterType.IsGenericType
-                    ? new CodeParameterDeclarationExpression(
+                var p = (CodeParameterDeclarationExpression)null;
+
+                if (param.ParameterType.IsGenericType) {
+                    p = new CodeParameterDeclarationExpression(
                         TypeUtils.GetParameterizedTemplateName(param.ParameterType, true,
                             tt => CurrentNamespace != tt.Namespace && !ReferencedNamespaces.Contains(tt.Namespace)),
-                        paramName)
-                    : new CodeParameterDeclarationExpression(param.ParameterType, paramName);
+                        paramName);
+                }
+                else if (param.ParameterType.FullName.StartsWith("Orleans")) {
+                    p = new CodeParameterDeclarationExpression(new CodeTypeReference("global::" + param.ParameterType.FullName), paramName);
+                }
+                else {
+                    p = new CodeParameterDeclarationExpression(param.ParameterType, paramName);
+                }
 
                 p.Direction = FieldDirection.In;
                 referenceMethod.Parameters.Add(p);

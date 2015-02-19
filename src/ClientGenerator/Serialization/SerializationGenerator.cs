@@ -41,6 +41,8 @@ namespace Orleans.CodeGeneration.Serialization
 
         const string SERIALIZER_CLASS_NAME_SUFFIX = "Serialization";
 
+        const string GLOBAL_NAMESPACE_PREFIX = "global::";
+
         /// <summary>
         /// Generate all the necessary logic for serialization of payload types used by grain interfaces.
         /// </summary>
@@ -60,8 +62,8 @@ namespace Orleans.CodeGeneration.Serialization
             container.Imports.Add(new CodeNamespaceImport("System"));
             container.Imports.Add(new CodeNamespaceImport("System.Collections.Generic"));
             container.Imports.Add(new CodeNamespaceImport("System.Reflection"));
-            container.Imports.Add(new CodeNamespaceImport("Orleans.Serialization"));
-            container.Imports.Add(new CodeNamespaceImport(t.Namespace));
+            container.Imports.Add(new CodeNamespaceImport(GLOBAL_NAMESPACE_PREFIX + "Orleans.Serialization"));
+            container.Imports.Add(new CodeNamespaceImport(GLOBAL_NAMESPACE_PREFIX + t.Namespace));
 
             // Create the class declaration, including any required generic parameters
             // At one time this was a struct, not a class, so all the variable names are "structFoo". Too bad.
@@ -113,10 +115,10 @@ namespace Orleans.CodeGeneration.Serialization
             }
 
             // A couple of repeatedly-used CodeDom snippets
-            var classType = new CodeTypeOfExpression(className);
-            var classTypeReference = new CodeTypeReference(className);
+            var classType = new CodeTypeOfExpression(GLOBAL_NAMESPACE_PREFIX+className);
+            var classTypeReference = new CodeTypeReference(GLOBAL_NAMESPACE_PREFIX+className);
             var objectTypeReference = new CodeTypeReference(typeof(object));
-            var serMgrRefExp = new CodeTypeReferenceExpression(typeof(SerializationManager));
+            var serMgrRefExp = new CodeTypeReferenceExpression(GLOBAL_NAMESPACE_PREFIX + typeof(SerializationManager).FullName);
             var currentSerialzationContext = new CodePropertyReferenceExpression(new CodeTypeReferenceExpression(typeof(SerializationContext)), "Current");
 
             // Static DeepCopyInner method:
@@ -147,7 +149,7 @@ namespace Orleans.CodeGeneration.Serialization
             serializer.Attributes = (serializer.Attributes & ~MemberAttributes.ScopeMask) | MemberAttributes.Static;
             serializer.Name = "Serializer";
             serializer.Parameters.Add(new CodeParameterDeclarationExpression(objectTypeReference, "untypedInput"));
-            serializer.Parameters.Add(new CodeParameterDeclarationExpression(typeof(BinaryTokenStreamWriter), "stream"));
+            serializer.Parameters.Add(new CodeParameterDeclarationExpression(GLOBAL_NAMESPACE_PREFIX+typeof(BinaryTokenStreamWriter).FullName, "stream"));
             serializer.Parameters.Add(new CodeParameterDeclarationExpression(typeof(Type), "expected"));
             serializer.ReturnType = new CodeTypeReference(typeof(void));
             serializer.Statements.Add(new CodeVariableDeclarationStatement(classTypeReference, "input",
@@ -216,22 +218,26 @@ namespace Orleans.CodeGeneration.Serialization
                         new CodeObjectCreateExpression(typeName));
                 }
             }
-            else if (t.IsValueType)
-            {
-                constructor = !t.ContainsGenericParameters 
-                    ? new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(t))) 
-                    : new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(TypeUtils.GetTemplatedName(t))));
+            else if (t.IsValueType) {
+                if (!t.ContainsGenericParameters) {
+                    if (t.FullName.StartsWith("Orleans")) {
+                        constructor = new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(GLOBAL_NAMESPACE_PREFIX + t.FullName)));
+                    }
+                    else {
+                        constructor = new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(t)));
+                    }
                 }
-                else
-                {
-                if (!t.ContainsGenericParameters)
-                {
+                else {
+                    constructor = new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(TypeUtils.GetTemplatedName(t))));
+                }
+            }
+            else {
+                if (!t.ContainsGenericParameters) {
                     constructor = new CodeVariableDeclarationStatement(classTypeReference, "result",
                         new CodeCastExpression(className, new CodeMethodInvokeExpression(new CodeTypeReferenceExpression(typeof(System.Runtime.Serialization.FormatterServices)),
                             "GetUninitializedObject", new CodeTypeOfExpression(t))));
                 }
-                else
-                {
+                else {
                     constructor = new CodeVariableDeclarationStatement(classTypeReference, "result",
                         new CodeCastExpression(className, new CodeMethodInvokeExpression(new CodeTypeReferenceExpression(typeof(System.Runtime.Serialization.FormatterServices)),
                             "GetUninitializedObject", new CodeTypeOfExpression(TypeUtils.GetTemplatedName(t)))));

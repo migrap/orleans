@@ -453,19 +453,26 @@ namespace Orleans.CodeGeneration
             }
             File.Delete(source);
             File.Move(source + ".copy", source);
-        }
+        }        
 
         /// <summary>
         /// output grain reference source file for debug issue
         /// </summary>
         private static void OutputReferenceSourceFile(CodeCompileUnit unit, NamespaceGenerator grainNamespace, CodeGenOptions options)
-        {
+        {            
             CodeNamespace referenceNameSpace = grainNamespace.ReferencedNamespace;
 
             // add referrenced named spaces
-            foreach (string referredNamespace in grainNamespace.ReferencedNamespaces)
-                if (referredNamespace != referenceNameSpace.Name)
-                    referenceNameSpace.Imports.Add(new CodeNamespaceImport(referredNamespace));
+            foreach (string referredNamespace in grainNamespace.ReferencedNamespaces) {
+                if (referredNamespace != referenceNameSpace.Name) {
+                    if (referredNamespace.StartsWith("Orleans")) {
+                        referenceNameSpace.Imports.Add(new CodeNamespaceImport("global::" + referredNamespace));
+                    }
+                    else {
+                        referenceNameSpace.Imports.Add(new CodeNamespaceImport(referredNamespace));
+                    }
+                }
+            }
 
             if (options.TargetLanguage == Language.VisualBasic && referenceNameSpace.Name.StartsWith(options.RootNamespace))
             {

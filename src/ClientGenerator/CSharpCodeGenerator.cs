@@ -50,7 +50,16 @@ namespace Orleans.CodeGeneration
 
             referred(type);
 
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type);
+            var name = (string)null;
+            if (noNamespace(type) && !type.IsNested) {
+                name = type.Name;
+            }
+            else if (TypeUtils.GetFullName(type).StartsWith("Orleans")) {
+                name = "global::" + TypeUtils.GetFullName(type);
+            }
+            else {
+                name = TypeUtils.GetFullName(type);
+            }
 
             if (!type.IsGenericType)
             {
