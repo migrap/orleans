@@ -659,6 +659,7 @@ namespace Orleans
         ProxyClient_OGC_UnhandledExceptionInOneWayInvoke = ProxyClientBase + 27,
         ProxyClient_ClientInvokeCallback_Error      = ProxyClientBase + 28,
         ProxyClient_StartDone                       = ProxyClientBase + 29,
+        ProxyClient_OGC_TargetNotFound_2            = ProxyClientBase + 30,
 
         MessagingBase                           = Runtime + 1000,
         Messaging_IMA_DroppingConnection        = MessagingBase + 1,
@@ -749,6 +750,10 @@ namespace Orleans
         GatewayManager_NoGateways               = GatewayBase + 13,
         GatewayNetworkError                     = GatewayBase + 14,
         GatewayFailedToParse                    = GatewayBase + 15,
+        ClientRegistrarFailedToRegister         = GatewayBase + 16,
+        ClientRegistrarFailedToRegister_2       = GatewayBase + 17,
+        ClientRegistrarFailedToUnregister       = GatewayBase + 18,
+        ClientRegistrarTimerFailed              = GatewayBase + 19,
 
         TimerBase                               = Runtime + 1400,
         TimerChangeError                        = PerfCounterTimerError, // Backward compatability

@@ -39,9 +39,9 @@ namespace Orleans.Streams
         {
             appStreamProviders = new ProviderLoader<IStreamProvider>();
 
-            if (!configs.ContainsKey("Stream")) return;
+            if (!configs.ContainsKey(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)) return;
 
-            appStreamProviders.LoadProviders(configs["Stream"].Providers, this);
+            appStreamProviders.LoadProviders(configs[ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME].Providers, this);
             await appStreamProviders.InitProviders(providerRuntime);
         }
 
@@ -50,8 +50,11 @@ namespace Orleans.Streams
             var providers = appStreamProviders.GetProviders();
             foreach (IStreamProvider streamProvider in providers)
             {
-                var provider = (IStreamProviderImpl) streamProvider;
-                await provider.Start();   
+                var provider = streamProvider as IStreamProviderImpl;
+                if (provider != null)
+                {
+                    await provider.Start();   
+                }
             }
         }
 

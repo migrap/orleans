@@ -88,6 +88,7 @@ namespace Orleans.Runtime
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
         private IMembershipOracle membershipOracle;
+        private ClientObserverRegistrar clientRegistrar;
         private Watchdog platformWatchdog;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
@@ -247,17 +248,6 @@ namespace Orleans.Runtime
                 typeManager);
             messageCenter.RerouteHandler = InsideRuntimeClient.Current.RerouteMessage;
             messageCenter.SniffIncomingMessage = InsideRuntimeClient.Current.SniffIncomingMessage;
-            messageCenter.ClientDropHandler = grainIds =>
-            {
-                catalog.DeleteGrainsLocal(grainIds).Ignore();
-                scheduler.RunOrQueueAction(() =>
-                {
-                    // Consider: batch delete
-                    foreach (var id in grainIds)
-                        LocalGrainDirectory.DeleteGrain(id).Ignore();
-                    
-                }, catalog.SchedulingContext);
-            };
 
             siloStatistics.MetricsTable.Scheduler = scheduler;
             siloStatistics.MetricsTable.ActivationDirectory = activationDirectory;
@@ -300,7 +290,8 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
-            RegisterSystemTarget(new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory));
+            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory, LocalScheduler, OrleansConfig);
+            RegisterSystemTarget(clientRegistrar);
             RegisterSystemTarget(new TypeManager(SiloAddress, LocalTypeManager));
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
@@ -360,8 +351,8 @@ namespace Orleans.Runtime
         {
             lock (lockable)
             {
-                if (SystemStatus.Current != SystemStatus.Created)
-                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Start state. This silo is in the {0} state.", SystemStatus.Current));
+                if (!SystemStatus.Current.Equals(SystemStatus.Created))
+                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", SystemStatus.Current));
                 
                 SystemStatus.Current = SystemStatus.Starting;
             }
@@ -465,8 +456,11 @@ namespace Orleans.Runtime
                 // Now that we're active, we can start the gateway
                 var mc = messageCenter as MessageCenter;
                 if (mc != null)
-                    mc.StartGateway();
-                
+                    mc.StartGateway(clientRegistrar);
+
+                scheduler.QueueTask(clientRegistrar.Start, ((SystemTarget)clientRegistrar).SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+
                 SystemStatus.Current = SystemStatus.Running;
             }
             catch (Exception exc)
@@ -533,7 +527,7 @@ namespace Orleans.Runtime
                     stopAlreadyInProgress = true;
                     // Drop through to wait below
                 }
-                else if (SystemStatus.Current != SystemStatus.Running)
+                else if (!SystemStatus.Current.Equals(SystemStatus.Running))
                 {
                     throw new InvalidOperationException(String.Format("Calling Silo.Stop() on a silo which is not in the Running state. This silo is in the {0} state.", SystemStatus.Current));
                 }
@@ -652,7 +646,7 @@ namespace Orleans.Runtime
             {
                 lock (lockable)
                 {
-                    if (SystemStatus.Current != SystemStatus.Running) return;
+                    if (!SystemStatus.Current.Equals(SystemStatus.Running)) return;
                     
                     SystemStatus.Current = SystemStatus.Stopping;
                 }
